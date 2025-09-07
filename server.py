@@ -13,14 +13,42 @@ class FlightRequest(BaseModel):
     destination: str
     departure_date: str
 
-# Diccionario de IATA -> Ciudad
+# Diccionario completo de IATA -> Ciudad (más amplio)
 IATA_TO_CITY = {
+    # Centroamérica
     "GUA": "Guatemala City",
     "PTY": "Panama City",
+    "SAL": "San Salvador",
+    "SAP": "San Pedro Sula",
+    "TGU": "Tegucigalpa",
+    "SJO": "San Jose",
+    "LIR": "Liberia",
+    # Norteamérica
+    "MEX": "Mexico City",
+    "CUN": "Cancun",
     "NYC": "New York",
-    "PAR": "Paris",
+    "LAX": "Los Angeles",
+    "MIA": "Miami",
+    "ORD": "Chicago",
+    # Sudamérica
+    "BOG": "Bogota",
+    "LIM": "Lima",
+    "GRU": "Sao Paulo",
+    "EZE": "Buenos Aires",
+    "SCL": "Santiago",
+    "CCS": "Caracas",
+    # Europa
+    "MAD": "Madrid",
+    "BCN": "Barcelona",
     "LON": "London",
-    # ... agrega más ciudades según tu mock
+    "PAR": "Paris",
+    "FRA": "Frankfurt",
+    # Asia
+    "HKG": "Hong Kong",
+    "NRT": "Tokyo",
+    "BKK": "Bangkok",
+    "DEL": "Delhi",
+    "SIN": "Singapore"
 }
 
 # Mock de actividades por ciudad
@@ -34,7 +62,23 @@ CITY_ACTIVITIES = {
         {"name": "Canal de Panamá", "rating": 4.8},
         {"name": "Casco Viejo", "rating": 4.6},
         {"name": "Biomuseo", "rating": 4.5}
+    ],
+    "New York": [
+        {"name": "Times Square", "rating": 4.7},
+        {"name": "Central Park", "rating": 4.8},
+        {"name": "Metropolitan Museum of Art", "rating": 4.7}
+    ],
+    "Paris": [
+        {"name": "Torre Eiffel", "rating": 4.9},
+        {"name": "Museo del Louvre", "rating": 4.8},
+        {"name": "Catedral de Notre Dame", "rating": 4.7}
+    ],
+    "Tokyo": [
+        {"name": "Templo Senso-ji", "rating": 4.8},
+        {"name": "Shibuya Crossing", "rating": 4.7},
+        {"name": "Parque Ueno", "rating": 4.6}
     ]
+    # Puedes agregar más ciudades con sus actividades
 }
 
 # Función para obtener clima
@@ -45,6 +89,7 @@ def get_weather(iata_code):
 
     api_key = os.getenv("OPENWEATHER_API_KEY")
     if not api_key:
+        # Mock si no hay API Key
         return {"temperature": 25, "condition": "sunny"}
 
     try:
@@ -58,6 +103,7 @@ def get_weather(iata_code):
     except:
         return {"temperature": 25, "condition": "sunny"}
 
+# Función para obtener actividades
 def get_activities(iata_code):
     city = IATA_TO_CITY.get(iata_code)
     if not city:
@@ -78,6 +124,7 @@ def get_flights(request: FlightRequest):
     flights = []
 
     if data.get("data"):
+        # Usar vuelos reales si hay datos
         for flight in data.get("data", []):
             arrival_iata = flight.get("arrival", {}).get("iata")
             flights.append({
@@ -92,7 +139,7 @@ def get_flights(request: FlightRequest):
                 "activities": get_activities(arrival_iata)
             })
     else:
-        # Mock si la API falla o no hay datos
+        # Mock de vuelos si la API falla o no hay datos
         flights = [
             {
                 "flight_number": "CM123",
