@@ -1,19 +1,23 @@
+# server.py
 from fastapi import FastAPI
 from pydantic import BaseModel
 import requests
 from dotenv import load_dotenv
 import os
+from datetime import datetime
 
+# Cargar variables de entorno
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(title="MCP Flight Server", version="1.0")
 
+# Modelo para recibir los datos de vuelo
 class FlightRequest(BaseModel):
     origin: str
     destination: str
-    departure_date: str
+    departure_date: str  # puede ser YYYY-MM-DD o DD/MM/YYYY
 
-# Diccionario completo de IATA -> Ciudad (más amplio)
+# Diccionario ampliado de códigos IATA -> ciudad
 IATA_TO_CITY = {
     # Centroamérica
     "GUA": "Guatemala City",
@@ -43,15 +47,20 @@ IATA_TO_CITY = {
     "LON": "London",
     "PAR": "Paris",
     "FRA": "Frankfurt",
+    "AMS": "Amsterdam",
+    "ROM": "Rome",
+    "BER": "Berlin",
+    "MXP": "Milan",
     # Asia
     "HKG": "Hong Kong",
     "NRT": "Tokyo",
     "BKK": "Bangkok",
     "DEL": "Delhi",
-    "SIN": "Singapore"
+    "SIN": "Singapore",
+    "ICN": "Seoul"
 }
 
-# Mock de actividades por ciudad
+# Mock de actividades turísticas por ciudad
 CITY_ACTIVITIES = {
     "Guatemala City": [
         {"name": "Museo Nacional de Arqueología", "rating": 4.6},
@@ -63,60 +72,73 @@ CITY_ACTIVITIES = {
         {"name": "Casco Viejo", "rating": 4.6},
         {"name": "Biomuseo", "rating": 4.5}
     ],
-    "New York": [
-        {"name": "Times Square", "rating": 4.7},
-        {"name": "Central Park", "rating": 4.8},
-        {"name": "Metropolitan Museum of Art", "rating": 4.7}
-    ],
     "Paris": [
         {"name": "Torre Eiffel", "rating": 4.9},
         {"name": "Museo del Louvre", "rating": 4.8},
         {"name": "Catedral de Notre Dame", "rating": 4.7}
+    ],
+    "New York": [
+        {"name": "Times Square", "rating": 4.7},
+        {"name": "Central Park", "rating": 4.8},
+        {"name": "Metropolitan Museum of Art", "rating": 4.7}
     ],
     "Tokyo": [
         {"name": "Templo Senso-ji", "rating": 4.8},
         {"name": "Shibuya Crossing", "rating": 4.7},
         {"name": "Parque Ueno", "rating": 4.6}
     ]
-    # Puedes agregar más ciudades con sus actividades
+    # Puedes agregar más ciudades según el alcance del proyecto
 }
 
-# Función para obtener clima
+# Función para obtener el clima de la ciudad
 def get_weather(iata_code):
     city = IATA_TO_CITY.get(iata_code)
     if not city:
-        return {"temperature": 25, "condition": "unknown city"}
+        return {"temperature": None, "condition": "unknown city"}
 
     api_key = os.getenv("OPENWEATHER_API_KEY")
     if not api_key:
-        # Mock si no hay API Key
-        return {"temperature": 25, "condition": "sunny"}
+        return {"temperature": 25, "condition": "sunny"}  # mock si no hay API key
 
     try:
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         data = response.json()
         if "main" in data and "weather" in data:
-            return {"temperature": data["main"]["temp"], "condition": data["weather"][0]["description"]}
+            return {
+                "temperature": round(data["main"]["temp"], 1),
+                "condition": data["weather"][0]["description"]
+            }
         else:
             return {"temperature": 25, "condition": "sunny"}
-    except:
+    except Exception:
         return {"temperature": 25, "condition": "sunny"}
 
-# Función para obtener actividades
+# Función para obtener actividades según la ciudad
 def get_activities(iata_code):
     city = IATA_TO_CITY.get(iata_code)
     if not city:
         return []
     return CITY_ACTIVITIES.get(city, [])
 
+# Endpoint principal de MCP Server para vuelos
 @app.post("/get_flights")
 def get_flights(request: FlightRequest):
+    # Validar fecha y normalizar a YYYY-MM-DD
+    try:
+        if "/" in request.departure_date:
+            dt = datetime.strptime(request.departure_date, "%d/%m/%Y")
+        else:
+            dt = datetime.strptime(request.departure_date, "%Y-%m-%d")
+        departure_date = dt.strftime("%Y-%m-%d")
+    except Exception:
+        departure_date = request.departure_date
+
     api_key = os.getenv("AVIATIONSTACK_API_KEY")
-    url = f"http://api.aviationstack.com/v1/flights?access_key={api_key}&dep_iata={request.origin}&arr_iata={request.destination}&flight_date={request.departure_date}"
+    url = f"http://api.aviationstack.com/v1/flights?access_key={api_key}&dep_iata={request.origin}&arr_iata={request.destination}&flight_date={departure_date}"
 
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         data = response.json()
     except:
         data = {"data": []}
@@ -124,7 +146,7 @@ def get_flights(request: FlightRequest):
     flights = []
 
     if data.get("data"):
-        # Usar vuelos reales si hay datos
+        # Datos reales de la API
         for flight in data.get("data", []):
             arrival_iata = flight.get("arrival", {}).get("iata")
             flights.append({
@@ -139,15 +161,15 @@ def get_flights(request: FlightRequest):
                 "activities": get_activities(arrival_iata)
             })
     else:
-        # Mock de vuelos si la API falla o no hay datos
+        # Mock de vuelos si falla la API o no hay datos
         flights = [
             {
                 "flight_number": "CM123",
                 "airline": "Copa Airlines",
                 "departure_airport": request.origin,
-                "departure_time": f"{request.departure_date}T08:30:00",
+                "departure_time": f"{departure_date}T08:30:00",
                 "arrival_airport": request.destination,
-                "arrival_time": f"{request.departure_date}T10:00:00",
+                "arrival_time": f"{departure_date}T10:00:00",
                 "status": "scheduled",
                 "weather": get_weather(request.destination),
                 "activities": get_activities(request.destination)
@@ -156,9 +178,9 @@ def get_flights(request: FlightRequest):
                 "flight_number": "AV456",
                 "airline": "Avianca",
                 "departure_airport": request.origin,
-                "departure_time": f"{request.departure_date}T12:00:00",
+                "departure_time": f"{departure_date}T12:00:00",
                 "arrival_airport": request.destination,
-                "arrival_time": f"{request.departure_date}T13:30:00",
+                "arrival_time": f"{departure_date}T13:30:00",
                 "status": "scheduled",
                 "weather": get_weather(request.destination),
                 "activities": get_activities(request.destination)
