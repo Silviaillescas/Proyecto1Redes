@@ -7,6 +7,7 @@ import requests
 import datetime
 import json
 import re
+import subprocess
 
 # 1️⃣ Cargar variables del .env
 load_dotenv()
@@ -84,7 +85,10 @@ CITY_ACTIVITIES = {
     ]
 }
 
-# 6️⃣ Función para preguntar al LLM y mantener contexto
+# 6️⃣ Carpeta para MCP Filesystem
+FILESYSTEM = {}
+
+# 7️⃣ Función para preguntar al LLM y mantener contexto
 def ask_llm(prompt, context=""):
     try:
         messages = [
@@ -100,7 +104,7 @@ def ask_llm(prompt, context=""):
     except Exception as e:
         return f"Lo siento, hubo un error con el LLM: {str(e)}"
 
-# 7️⃣ Función para llamar al MCP Server de vuelos
+# 8️⃣ Función MCP Vuelos
 def call_mcp_flights(origin, destination, departure_date):
     payload = {
         "origin": origin,
@@ -111,10 +115,8 @@ def call_mcp_flights(origin, destination, departure_date):
         response = requests.post("http://127.0.0.1:8000/get_flights", json=payload)
         result = response.json()
     except Exception:
-        # Fallback: mock de vuelos si el servidor MCP no responde
         result = {"flights": []}
 
-    # Guardar en log
     log.append({
         "timestamp": str(datetime.datetime.now()),
         "endpoint": "/get_flights",
@@ -124,42 +126,36 @@ def call_mcp_flights(origin, destination, departure_date):
 
     return result
 
-# 8️⃣ Función para obtener clima
+# 9️⃣ Función MCP Weather
 def get_weather(iata_code):
     city = IATA_TO_CITY.get(iata_code)
     if not city:
         return {"temperature": 25, "condition": "unknown city"}
-
     api_key = os.getenv("OPENWEATHER_API_KEY")
     if not api_key:
         return {"temperature": 25, "condition": "sunny"}
-
     try:
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
         response = requests.get(url)
         data = response.json()
         if "main" in data and "weather" in data:
-            return {
-                "temperature": data["main"]["temp"],
-                "condition": data["weather"][0]["description"]
-            }
+            return {"temperature": data["main"]["temp"], "condition": data["weather"][0]["description"]}
         else:
             return {"temperature": 25, "condition": "sunny"}
     except:
         return {"temperature": 25, "condition": "sunny"}
 
-# 9️⃣ Función para obtener actividades
+# 🔟 Función MCP Actividades
 def get_activities(iata_code):
     city = IATA_TO_CITY.get(iata_code)
     if not city:
         return []
     return CITY_ACTIVITIES.get(city, [])
 
-# 🔟 Función para formatear la salida de vuelos
+# 1️⃣1️⃣ Formatear vuelos
 def format_flights(flights):
     if not flights:
         return "No se encontraron vuelos."
-
     output = "\nVuelos encontrados:\n"
     for f in flights:
         output += f"- {f['airline']} {f['flight_number']} | Salida: {f['departure_time']} | Llegada: {f['arrival_time']} | Estado: {f['status']}\n"
@@ -171,29 +167,24 @@ def format_flights(flights):
         output += "\n"
     return output
 
-# 1️⃣1️⃣ Función para mostrar log
+# 1️⃣2️⃣ Mostrar log
 def show_log():
     print("\n=== LOG DE INTERACCIONES ===")
     print(json.dumps(log, indent=2))
     print("===========================\n")
 
-# 1️⃣2️⃣ Función para parsear texto natural
+# 1️⃣3️⃣ Parsear vuelo
 def parse_flight_request(text):
-    # Buscar fecha
     date_match = re.search(r"(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})", text)
     if not date_match:
         return None
     date_str = date_match.group(0)
-
-    # Convertir DD-MM-YYYY a YYYY-MM-DD
     if "-" in date_str and len(date_str.split("-")[0]) == 2:
         day, month, year = date_str.split("-")
         date_str = f"{year}-{month}-{day}"
 
     origin = None
     destination = None
-
-    # Buscar ciudades ignorando "City" y mayúsculas
     for code, city in IATA_TO_CITY.items():
         city_name = city.replace(" City", "").lower()
         if city_name in text.lower():
@@ -201,18 +192,88 @@ def parse_flight_request(text):
                 origin = code
             elif code != origin:
                 destination = code
-
     if not origin or not destination:
         return None
-
     return origin, destination, date_str
 
-# 1️⃣3️⃣ Bucle principal
+# 1️⃣4️⃣ MCP Filesystem
+def filesystem_create(command):
+    parts = command.split(maxsplit=2)
+    if len(parts) < 3:
+        return "Formato incorrecto. Usa: crear archivo NOMBRE_CONTENIDO"
+    _, filename, content = parts
+    FILESYSTEM[filename] = content
+    return f"Archivo '{filename}' creado en MCP Filesystem."
+
+def filesystem_read(command):
+    parts = command.split(maxsplit=2)
+    if len(parts) < 3:
+        return "Formato incorrecto. Usa: leer archivo NOMBRE"
+    _, filename = parts[:2]
+    content = FILESYSTEM.get(filename)
+    if not content:
+        return f"No se encontró el archivo {filename}"
+    return f"Contenido de archivo:\n{content}"
+
+def filesystem_list():
+    return f"Archivos en MCP Filesystem: {list(FILESYSTEM.keys())}"
+
+# 1️⃣5️⃣ MCP Git real
+GIT_REPO_PATH = "./mcp_git_repo"
+
+def git_commit_real(command):
+    parts = command.split(maxsplit=2)
+    if len(parts) < 3:
+        return "Formato incorrecto. Usa: git commit NOMBRE_ARCHIVO MENSAJE"
+    _, filename, message = parts
+    try:
+        if not os.path.exists(GIT_REPO_PATH):
+            os.makedirs(GIT_REPO_PATH, exist_ok=True)
+            subprocess.run(["git", "init"], cwd=GIT_REPO_PATH, check=True)
+        file_path = os.path.join(GIT_REPO_PATH, filename)
+        if not os.path.exists(file_path):
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write("")
+        subprocess.run(["git", "add", filename], cwd=GIT_REPO_PATH, check=True)
+        subprocess.run(["git", "commit", "-m", message], cwd=GIT_REPO_PATH, check=True)
+        log.append({
+            "timestamp": str(datetime.datetime.now()),
+            "endpoint": "MCP Git",
+            "request": {"file": filename, "message": message},
+            "response": "Commit realizado"
+        })
+        return f"Archivo '{filename}' agregado y commit realizado con mensaje: '{message}'"
+    except subprocess.CalledProcessError as e:
+        return f"Error en Git: {e}"
+    except Exception as e:
+        return f"Error general: {e}"
+
+# 1️⃣6️⃣ MCP Chess con Stockfish
+STOCKFISH_PATH = "C:/Users/Silvia/stockfish/stockfish_15_x64.exe"  # ⚠️ Cambia según tu ruta
+
+def analyze_chess(command):
+    parts = command.split(maxsplit=1)
+    if len(parts) < 2:
+        return "Formato incorrecto. Usa: analizar ajedrez FEN/PGN"
+    fen = parts[1]
+    try:
+        # Analiza la posición usando Stockfish
+        process = subprocess.run([STOCKFISH_PATH],
+                                 input=f"position fen {fen}\ngo\n",
+                                 capture_output=True, text=True, timeout=5)
+        return process.stdout
+    except Exception as e:
+        return f"Error al analizar partida de ajedrez: {str(e)}"
+
+# 1️⃣7️⃣ Bucle principal
 def main():
     print("Bienvenido al Chatbot MCP Server 🚀")
     print("Escribe 'ver log' para mostrar el historial de interacciones")
     print("Escribe 'salir' para terminar la sesión")
-    print("Comando para vuelos: buscar vuelo ORIGEN DESTINO FECHA (YYYY-MM-DD)\n")
+    print("Comando para vuelos: buscar vuelo ORIGEN DESTINO FECHA (YYYY-MM-DD)")
+    print("Comando para MCP Filesystem: crear archivo NOMBRE_CONTENIDO, leer archivo NOMBRE, listar archivos")
+    print("Comando para MCP Git: git commit NOMBRE_ARCHIVO MENSAJE")
+    print("Comando para MCP Chess: analizar ajedrez FEN/PGN\n")
 
     session_history = ""
 
@@ -225,14 +286,29 @@ def main():
         elif user_input.lower() == "ver log":
             show_log()
             continue
-        elif "vuelo" in user_input.lower():
+        elif user_input.lower().startswith("buscar vuelo"):
             flight_request = parse_flight_request(user_input)
             if flight_request:
                 origin, destination, departure_date = flight_request
                 flights_data = call_mcp_flights(origin, destination, departure_date)
                 print(format_flights(flights_data.get("flights", [])))
             else:
-                print("No pude interpretar la solicitud de vuelo. Usa formato: 'buscar vuelo ORIGEN DESTINO FECHA' o escribe claramente la ciudad y fecha.")
+                print("No pude interpretar la solicitud de vuelo. Usa formato: 'buscar vuelo ORIGEN DESTINO FECHA'")
+            continue
+        elif user_input.lower().startswith("crear archivo"):
+            print(filesystem_create(user_input))
+            continue
+        elif user_input.lower().startswith("leer archivo"):
+            print(filesystem_read(user_input))
+            continue
+        elif user_input.lower() == "listar archivos":
+            print(filesystem_list())
+            continue
+        elif user_input.lower().startswith("git commit"):
+            print(git_commit_real(user_input))
+            continue
+        elif user_input.lower().startswith("analizar ajedrez"):
+            print(analyze_chess(user_input))
             continue
 
         # Llamar al LLM
