@@ -252,9 +252,8 @@ def git_commit_real(command):
 # 1️⃣6️⃣ MCP Remoto - Hora actual
 def call_remote_time():
     try:
-        response = requests.get("http://127.0.0.1:8787/get_time")
-        data = response.json()
-        return data
+        response = requests.get("https://transparency-burton-hospitals-walker.trycloudflare.com/get_time")
+        return response.json()
     except Exception as e:
         return {"error": str(e)}
 
