@@ -248,22 +248,14 @@ def git_commit_real(command):
     except Exception as e:
         return f"Error general: {e}"
 
-# 1️⃣6️⃣ MCP Chess con Stockfish
-STOCKFISH_PATH = "C:/Users/Silvia/stockfish/stockfish_15_x64.exe"  # ⚠️ Cambia según tu ruta
-
-def analyze_chess(command):
-    parts = command.split(maxsplit=1)
-    if len(parts) < 2:
-        return "Formato incorrecto. Usa: analizar ajedrez FEN/PGN"
-    fen = parts[1]
+# 1️⃣6️⃣ MCP Remoto - Hora actual
+def call_remote_time():
     try:
-        # Analiza la posición usando Stockfish
-        process = subprocess.run([STOCKFISH_PATH],
-                                 input=f"position fen {fen}\ngo\n",
-                                 capture_output=True, text=True, timeout=5)
-        return process.stdout
+        response = requests.get("http://127.0.0.1:9000/get_time")  
+        return response.json()
     except Exception as e:
-        return f"Error al analizar partida de ajedrez: {str(e)}"
+        return {"error": str(e)}
+
 
 # 1️⃣7️⃣ Bucle principal
 def main():
@@ -273,7 +265,8 @@ def main():
     print("Comando para vuelos: buscar vuelo ORIGEN DESTINO FECHA (YYYY-MM-DD)")
     print("Comando para MCP Filesystem: crear archivo NOMBRE_CONTENIDO, leer archivo NOMBRE, listar archivos")
     print("Comando para MCP Git: git commit NOMBRE_ARCHIVO MENSAJE")
-    print("Comando para MCP Chess: analizar ajedrez FEN/PGN\n")
+    print("Comando para MCP Chess: analizar ajedrez FEN/PGN")
+    print("Comando para MCP Remoto: hora actual\n")
 
     session_history = ""
 
@@ -309,6 +302,11 @@ def main():
             continue
         elif user_input.lower().startswith("analizar ajedrez"):
             print(analyze_chess(user_input))
+            continue
+        elif user_input.lower().startswith("hora actual"):
+            print("Consultando al MCP remoto de hora...")
+            result = call_remote_time()
+            print(result)
             continue
 
         # Llamar al LLM
