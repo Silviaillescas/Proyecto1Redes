@@ -1,6 +1,7 @@
 # remote_mcp.py
 from fastapi import FastAPI
-import datetime
+from datetime import datetime
+import pytz  # Asegúrate de instalarlo: pip install pytz
 
 app = FastAPI()
 
@@ -10,9 +11,10 @@ def root():
 
 @app.get("/get_time")
 def get_time():
-    now = datetime.datetime.now()
+    tz = pytz.timezone("America/Guatemala")  # Zona horaria confiable en Windows
+    guatemala_now = datetime.now(tz)
     return {
-        "date": now.strftime("%Y-%m-%d"),
-        "time": now.strftime("%H:%M:%S"),
-        "timezone": str(now.astimezone().tzinfo)
+        "date": guatemala_now.strftime("%Y-%m-%d"),
+        "time": guatemala_now.strftime("%H:%M:%S"),
+        "timezone": str(guatemala_now.tzinfo)
     }

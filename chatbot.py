@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 
+
 # 1️⃣ Cargar variables del .env
 load_dotenv()
 
@@ -251,10 +252,22 @@ def git_commit_real(command):
 # 1️⃣6️⃣ MCP Remoto - Hora actual
 def call_remote_time():
     try:
-        response = requests.get("http://127.0.0.1:9000/get_time")  
-        return response.json()
+        response = requests.get("http://127.0.0.1:8787/get_time")
+        data = response.json()
+        return data
     except Exception as e:
         return {"error": str(e)}
+
+    
+def mostrar_hora_actual():
+    print("Tú: hora actual")
+    print("Consultando al MCP remoto de hora...")
+    hora = call_remote_time()
+    if isinstance(hora, dict):
+        print(f"Hora actual en Guatemala: {hora['date']} {hora['time']} ({hora['timezone']})")
+    else:
+        print(hora)  # En caso de error
+
 
 
 # 1️⃣7️⃣ Bucle principal
