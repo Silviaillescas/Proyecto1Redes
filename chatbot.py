@@ -9,7 +9,6 @@ import json
 import re
 import subprocess
 
-
 # 1️⃣ Cargar variables del .env
 load_dotenv()
 
@@ -21,75 +20,38 @@ log = []
 
 # 4️⃣ Diccionario de IATA -> Ciudad
 IATA_TO_CITY = {
-    # Centroamérica
-    "GUA": "Guatemala City",
-    "PTY": "Panama City",
-    "SAL": "San Salvador",
-    "SAP": "San Pedro Sula",
-    "TGU": "Tegucigalpa",
-    "SJO": "San Jose",
-    "LIR": "Liberia",
-    # Norteamérica
-    "MEX": "Mexico City",
-    "CUN": "Cancun",
-    "NYC": "New York",
-    "LAX": "Los Angeles",
-    "MIA": "Miami",
-    "ORD": "Chicago",
-    # Sudamérica
-    "BOG": "Bogota",
-    "LIM": "Lima",
-    "GRU": "Sao Paulo",
-    "EZE": "Buenos Aires",
-    "SCL": "Santiago",
-    "CCS": "Caracas",
-    # Europa
-    "MAD": "Madrid",
-    "BCN": "Barcelona",
-    "LON": "London",
-    "PAR": "Paris",
-    "FRA": "Frankfurt",
-    # Asia
-    "HKG": "Hong Kong",
-    "NRT": "Tokyo",
-    "BKK": "Bangkok",
-    "DEL": "Delhi",
-    "SIN": "Singapore"
+    "GUA": "Guatemala City", "PTY": "Panama City", "SAL": "San Salvador",
+    "SAP": "San Pedro Sula", "TGU": "Tegucigalpa", "SJO": "San Jose", "LIR": "Liberia",
+    "MEX": "Mexico City", "CUN": "Cancun", "NYC": "New York", "LAX": "Los Angeles",
+    "MIA": "Miami", "ORD": "Chicago", "BOG": "Bogota", "LIM": "Lima", "GRU": "Sao Paulo",
+    "EZE": "Buenos Aires", "SCL": "Santiago", "CCS": "Caracas", "MAD": "Madrid",
+    "BCN": "Barcelona", "LON": "London", "PAR": "Paris", "FRA": "Frankfurt",
+    "HKG": "Hong Kong", "NRT": "Tokyo", "BKK": "Bangkok", "DEL": "Delhi", "SIN": "Singapore"
 }
 
 # 5️⃣ Mock de actividades por ciudad
 CITY_ACTIVITIES = {
-    "Guatemala City": [
-        {"name": "Museo Nacional de Arqueología", "rating": 4.6},
-        {"name": "Parque Central", "rating": 4.4},
-        {"name": "Catedral Metropolitana", "rating": 4.5}
-    ],
-    "Panama City": [
-        {"name": "Canal de Panamá", "rating": 4.8},
-        {"name": "Casco Viejo", "rating": 4.6},
-        {"name": "Biomuseo", "rating": 4.5}
-    ],
-    "New York": [
-        {"name": "Times Square", "rating": 4.7},
-        {"name": "Central Park", "rating": 4.8},
-        {"name": "Metropolitan Museum of Art", "rating": 4.7}
-    ],
-    "Paris": [
-        {"name": "Torre Eiffel", "rating": 4.9},
-        {"name": "Museo del Louvre", "rating": 4.8},
-        {"name": "Catedral de Notre Dame", "rating": 4.7}
-    ],
-    "Tokyo": [
-        {"name": "Templo Senso-ji", "rating": 4.8},
-        {"name": "Shibuya Crossing", "rating": 4.7},
-        {"name": "Parque Ueno", "rating": 4.6}
-    ]
+    "Guatemala City": [{"name": "Museo Nacional de Arqueología", "rating": 4.6},
+                       {"name": "Parque Central", "rating": 4.4},
+                       {"name": "Catedral Metropolitana", "rating": 4.5}],
+    "Panama City": [{"name": "Canal de Panamá", "rating": 4.8},
+                    {"name": "Casco Viejo", "rating": 4.6},
+                    {"name": "Biomuseo", "rating": 4.5}],
+    "New York": [{"name": "Times Square", "rating": 4.7},
+                 {"name": "Central Park", "rating": 4.8},
+                 {"name": "Metropolitan Museum of Art", "rating": 4.7}],
+    "Paris": [{"name": "Torre Eiffel", "rating": 4.9},
+              {"name": "Museo del Louvre", "rating": 4.8},
+              {"name": "Catedral de Notre Dame", "rating": 4.7}],
+    "Tokyo": [{"name": "Templo Senso-ji", "rating": 4.8},
+              {"name": "Shibuya Crossing", "rating": 4.7},
+              {"name": "Parque Ueno", "rating": 4.6}]
 }
 
 # 6️⃣ Carpeta para MCP Filesystem
 FILESYSTEM = {}
 
-# 7️⃣ Función para preguntar al LLM y mantener contexto
+# 7️⃣ Función para preguntar al LLM
 def ask_llm(prompt, context=""):
     try:
         messages = [
@@ -105,13 +67,9 @@ def ask_llm(prompt, context=""):
     except Exception as e:
         return f"Lo siento, hubo un error con el LLM: {str(e)}"
 
-# 8️⃣ Función MCP Vuelos
+# 8️⃣ MCP Vuelos
 def call_mcp_flights(origin, destination, departure_date):
-    payload = {
-        "origin": origin,
-        "destination": destination,
-        "departure_date": departure_date
-    }
+    payload = {"origin": origin, "destination": destination, "departure_date": departure_date}
     try:
         response = requests.post("http://127.0.0.1:8000/get_flights", json=payload)
         result = response.json()
@@ -124,10 +82,9 @@ def call_mcp_flights(origin, destination, departure_date):
         "request": payload,
         "response": result
     })
-
     return result
 
-# 9️⃣ Función MCP Weather
+# 9️⃣ MCP Weather
 def get_weather(iata_code):
     city = IATA_TO_CITY.get(iata_code)
     if not city:
@@ -137,8 +94,7 @@ def get_weather(iata_code):
         return {"temperature": 25, "condition": "sunny"}
     try:
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
-        response = requests.get(url)
-        data = response.json()
+        data = requests.get(url).json()
         if "main" in data and "weather" in data:
             return {"temperature": data["main"]["temp"], "condition": data["weather"][0]["description"]}
         else:
@@ -146,7 +102,7 @@ def get_weather(iata_code):
     except:
         return {"temperature": 25, "condition": "sunny"}
 
-# 🔟 Función MCP Actividades
+# 🔟 MCP Actividades
 def get_activities(iata_code):
     city = IATA_TO_CITY.get(iata_code)
     if not city:
@@ -183,7 +139,6 @@ def parse_flight_request(text):
     if "-" in date_str and len(date_str.split("-")[0]) == 2:
         day, month, year = date_str.split("-")
         date_str = f"{year}-{month}-{day}"
-
     origin = None
     destination = None
     for code, city in IATA_TO_CITY.items():
@@ -208,7 +163,7 @@ def filesystem_create(command):
 
 def filesystem_read(command):
     parts = command.split(maxsplit=2)
-    if len(parts) < 3:
+    if len(parts) < 2:
         return "Formato incorrecto. Usa: leer archivo NOMBRE"
     _, filename = parts[:2]
     content = FILESYSTEM.get(filename)
@@ -252,21 +207,17 @@ def git_commit_real(command):
 # 1️⃣6️⃣ MCP Remoto - Hora actual
 def call_remote_time():
     try:
-        response = requests.get("https://transparency-burton-hospitals-walker.trycloudflare.com/get_time")
-        return response.json()
+        # Llamada al MCP remoto vía Cloudflare Tunnel
+        response = requests.get("https://roland-custom-big-rehab.trycloudflare.com/get_time", timeout=5)
+        data = response.json()
+        # Extraer solo lo que necesitas
+        return {
+            "date": data.get("date", "")[:10],
+            "time": data.get("time", "")[:8],
+            "timezone": data.get("timezone", "America/Guatemala")
+        }
     except Exception as e:
         return {"error": str(e)}
-
-    
-def mostrar_hora_actual():
-    print("Tú: hora actual")
-    print("Consultando al MCP remoto de hora...")
-    hora = call_remote_time()
-    if isinstance(hora, dict):
-        print(f"Hora actual en Guatemala: {hora['date']} {hora['time']} ({hora['timezone']})")
-    else:
-        print(hora)  # En caso de error
-
 
 
 # 1️⃣7️⃣ Bucle principal
@@ -312,20 +263,14 @@ def main():
         elif user_input.lower().startswith("git commit"):
             print(git_commit_real(user_input))
             continue
-        elif user_input.lower().startswith("analizar ajedrez"):
-            print(analyze_chess(user_input))
-            continue
         elif user_input.lower().startswith("hora actual"):
             print("Consultando al MCP remoto de hora...")
-            result = call_remote_time()
-            print(result)
+            print(call_remote_time())
             continue
 
         # Llamar al LLM
         response = ask_llm(user_input, context=session_history)
         print("Chatbot:", response)
-
-        # Guardar interacción en contexto
         session_history += f"\nUser: {user_input}\nAssistant: {response}"
 
 if __name__ == "__main__":
