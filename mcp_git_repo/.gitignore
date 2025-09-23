@@ -1,0 +1,6 @@
+
+# MCP defaults
+mcp-env/
+__pycache__/
+*.pyc
+.env
