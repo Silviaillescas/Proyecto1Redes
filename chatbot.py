@@ -461,7 +461,7 @@ def analyze_chess(command: str) -> str:
 # 17) MCP Remoto - Hora actual (Cloudflare Worker o local)
 def call_remote_time():
     try:
-        WORKER_URL = os.getenv("MCP_TIME_URL", "http://127.0.0.1:8080/get_time")  
+        WORKER_URL = os.getenv("MCP_TIME_URL", "http://127.0.0.1:8787/get_time")  
         response = requests.get(WORKER_URL, timeout=5)
         data = response.json()
         return {
@@ -471,6 +471,49 @@ def call_remote_time():
         }
     except Exception as e:
         return {"error": str(e)}
+    
+
+def format_ext1_result(res: dict) -> str:
+    if not isinstance(res, dict):
+        return str(res)
+    if "error" in res:
+        return f"❌ Error: {res['error']}"
+    lines = []
+    lines.append(f"🔎 Conexiones totales: {res.get('total_connections', 0)}")
+    lines.append(f"❗ Intentos fallidos: {res.get('failed_attempts', 0)}")
+    sus = res.get('suspicious_ips') or []
+    if sus:
+        lines.append("🚩 IPs sospechosas:")
+        for ip in sus:
+            lines.append(f"   • {ip}")
+    else:
+        lines.append("🚩 IPs sospechosas: (ninguna)")
+    lines.append(f"🧱 Posible fuerza bruta: {res.get('possible_bruteforce', False)}")
+    rep = res.get('ip_reputation') or {}
+    if rep:
+        lines.append("📚 Reputación IP:")
+        for ip, info in rep.items():
+            lines.append(f"   • {ip}: {info}")
+    return "\n".join(lines)
+
+def start_log_capture():
+    global LOG_CAPTURE, LOG_BUFFER
+    LOG_CAPTURE = True
+    LOG_BUFFER = []
+    return "📝 Modo captura de log ON. Pega líneas; escribe 'fin log' para analizar."
+
+def end_log_capture():
+    global LOG_CAPTURE, LOG_BUFFER
+    if not LOG_BUFFER:
+        LOG_CAPTURE = False
+        return "No capturé líneas. Modo captura OFF."
+    text = "\n".join(LOG_BUFFER)
+    LOG_CAPTURE = False
+    from mcp_clients import ext1_analyze_log_text
+    res = ext1_analyze_log_text(text)
+    LOG_BUFFER = []
+    return "📊 Resultado (lote):\n" + format_ext1_result(res)
+
 
 # 18) Bucle principal
 def main():
@@ -482,7 +525,8 @@ def main():
     print("                           leer archivo NOMBRE | leer archivo \"NOMBRE CON ESPACIOS\" | listar archivos")
     print("Comando para MCP Git: git commit NOMBRE_ARCHIVO MENSAJE")
     print("Comando para MCP Chess: analizar ajedrez FEN/PGN")
-    print("Comando para MCP Remoto: hora actual\n")
+    print("Comando para MCP Remoto: hora actual")
+    print("Comandos para MCP Externo 1: estado ext1 | analiza log: TEXTO | hora y estado\n")
 
     session_history = ""
 
@@ -532,10 +576,38 @@ def main():
             print(call_remote_time())
             continue
 
-        # LLM con contexto
+        # === NUEVOS COMANDOS: MCP EXTERNO 1 (logs del compañero) ===
+        if user_input.lower() == "estado ext1":
+            from mcp_clients import ext1_status
+            print("Consultando estado del MCP externo 1...")
+            print(ext1_status())
+            continue
+
+        if user_input.lower().startswith("analiza log:"):
+            from mcp_clients import ext1_analyze_log_text
+            log_text = user_input.split(":", 1)[1].strip()
+            if log_text:
+                print("Enviando log al MCP externo 1...")
+                res = ext1_analyze_log_text(log_text)
+                print(format_ext1_result(res))              
+            else:
+                print("Debes escribir algo después de 'analiza log:'")
+            continue
+
+        if user_input.lower() == "hora y estado":
+            from mcp_clients import get_remote_time, ext1_status
+            print("Consultando MCP remoto de hora y MCP externo 1...")
+            hora = get_remote_time()
+            estado = ext1_status()
+            print("🕒 Hora GT:", hora)
+            print("📡 Estado ext1:", estado)
+            continue
+
+        # === Default: LLM con contexto ===
         response = ask_llm(user_input, context=session_history)
         print("Chatbot:", response)
         session_history += f"\nUser: {user_input}\nAssistant: {response}"
+
 
 if __name__ == "__main__":
     main()
