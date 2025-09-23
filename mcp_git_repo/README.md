@@ -1,1 +1,1 @@
-Segunda línea\n
+Bienvenido a mi proyecto MCP
