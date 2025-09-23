@@ -607,6 +607,38 @@ def main():
         response = ask_llm(user_input, context=session_history)
         print("Chatbot:", response)
         session_history += f"\nUser: {user_input}\nAssistant: {response}"
+            # En el banner
+            
+        print("Comandos MCP Externo 2 (MoodST/Spotify):")
+        print("  estado moodst | spotify conectar | spotify completar URL_COMPLETA | spotify buscar: TEXTO")
+
+        # En el while True:
+        if user_input.lower() == "estado moodst":
+            from mcp_clients import ext2_status
+            print("Consultando MoodST adapter...")
+            print(ext2_status())
+            continue
+
+        if user_input.lower() == "spotify conectar":
+            from mcp_clients import ext2_auth_begin
+            res = ext2_auth_begin()
+            url = (res or {}).get("authorize_url") or (res or {}).get("url") or res
+            print("Abre en el navegador y autoriza:", url)
+            print("Luego usa: spotify completar URL_COMPLETA")
+            continue
+
+        if user_input.lower().startswith("spotify completar "):
+            from mcp_clients import ext2_auth_complete
+            redirect_url = user_input.split(" ", 2)[2].strip()
+            print(ext2_auth_complete(redirect_url))
+            continue
+
+        if user_input.lower().startswith("spotify buscar:"):
+            from mcp_clients import ext2_search_track
+            q = user_input.split(":", 1)[1].strip()
+            print(ext2_search_track(q, limit=5))
+            continue
+
 
 
 if __name__ == "__main__":

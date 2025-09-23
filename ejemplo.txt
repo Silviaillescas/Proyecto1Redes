@@ -1,0 +1,56 @@
+# ===========
+# EJEMPLOS LLM (chat general + contexto)
+# ===========
+¿Quién fue Alan Turing?
+¿En qué fecha nació?   # (debería entender que se refiere a Turing)
+Explícame en 2 líneas qué es una API.
+Dame 3 tips rápidos para estudiar mejor.
+
+# ===========
+# VUELOS (formato libre y formato comando)
+# ===========
+buscar vuelo Guatemala Panama 25-09-2025
+Quiero un vuelo de Guatemala a Panama el 2025-09-25
+Necesito vuelo de Ciudad de Guatemala a Paris para el 10-10-2025
+
+# ===========
+# FILESYSTEM (crear, leer, listar)
+# ===========
+listar archivos
+crear archivo README.md Bienvenido a mi proyecto MCP
+leer archivo README.md
+crear archivo "mi nota.txt" Hola con espacios en el nombre
+leer archivo "mi nota.txt"
+crear archivo config.json {"api":"ok","v":1}
+leer archivo config.json
+listar archivos
+
+# ===========
+# GIT (local real) — commit, set-remote y push
+# Nota: 'git set-remote' y 'git push' requieren tener Git configurado en tu sistema.
+# ===========
+git commit README.md "Primer commit del README"
+git commit "mi nota.txt" "Agregar nota con espacios"
+git set-remote https://github.com/silviaillescas/Proyecto1Redes.git
+git push
+
+# ===========
+# CHESS (Stockfish)
+# FEN y movidas SAN -> asegúrate de tener la ruta de Stockfish bien configurada
+# ===========
+analizar ajedrez rnbqkb1r/pppp1ppp/4pn2/8/2B5/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4
+analizar ajedrez e4 e5 Nf3 Nc6 Bb5
+analizar ajedrez 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6
+analizar ajedrez d4 d5 c4 e6 Nc3 Nf6 Bg5
+
+# ===========
+# MCP REMOTO (hora) — usa el Worker/URL configurado en MCP_TIME_URL
+# ===========
+hora actual
+
+# ===========
+# LOG E INTERACCIÓN
+# ===========
+ver log
+salir
+exit
