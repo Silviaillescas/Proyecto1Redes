@@ -10,6 +10,7 @@ import re
 import subprocess
 import threading
 import chess
+USE_JSONRPC = os.getenv("MCP_USE_JSONRPC", "0") == "1"
 
 
 # 1) Cargar variables del .env
@@ -83,24 +84,48 @@ def ask_llm(prompt, context=""):
     except Exception as e:
         return f"Error del LLM: {type(e).__name__}: {str(e)}"
 
-# 8) MCP Vuelos (tu FastAPI local)
+# 8) MCP Vuelos (FastAPI local)
 def call_mcp_flights(origin, destination, departure_date):
-    payload = {"origin": origin, "destination": destination, "departure_date": departure_date}
     try:
-        response = requests.post("http://127.0.0.1:8000/get_flights", json=payload, timeout=8)
-        result = response.json()
+        if USE_JSONRPC:
+            # JSON-RPC 2.0
+            payload_rpc = {
+                "jsonrpc": "2.0",
+                "method": "get_flights",
+                "params": {
+                    "origin": origin,
+                    "destination": destination,
+                    "departure_date": departure_date
+                },
+                "id": 1
+            }
+            r = requests.post("http://127.0.0.1:8000/rpc", json=payload_rpc, timeout=8)
+            j = r.json()
+            result = j.get("result", {"flights": []})
+            endpoint = "/rpc"
+            req_logged = payload_rpc
+        else:
+            # REST clásico 
+            payload_rest = {"origin": origin, "destination": destination, "departure_date": departure_date}
+            r = requests.post("http://127.0.0.1:8000/get_flights", json=payload_rest, timeout=8)
+            result = r.json()
+            endpoint = "/get_flights"
+            req_logged = payload_rest
     except Exception as e:
         result = {"flights": [], "error": f"Fallo MCP flights: {str(e)}"}
+        endpoint = "/rpc" if USE_JSONRPC else "/get_flights"
+        req_logged = {"origin": origin, "destination": destination, "departure_date": departure_date}
 
     log.append({
         "timestamp": str(datetime.datetime.now()),
-        "endpoint": "/get_flights",
-        "request": payload,
+        "endpoint": endpoint,
+        "request": req_logged,
         "response": result
     })
     return result
 
-# 9) MCP Weather (no se usa directamente aquí; lo hace tu server de vuelos)
+
+# 9) MCP Weather (no se usa directamente aquí; lo hace server de vuelos)
 def get_weather(iata_code):
     city = IATA_TO_CITY.get(iata_code)
     if not city:
@@ -459,19 +484,40 @@ def analyze_chess(command: str) -> str:
 
 
 # 17) MCP Remoto - Hora actual (Cloudflare Worker o local)
+from urllib.parse import urlparse, parse_qs
+
 def call_remote_time():
     try:
-        WORKER_URL = os.getenv("MCP_TIME_URL", "http://127.0.0.1:8787/get_time")  
-        response = requests.get(WORKER_URL, timeout=5)
-        data = response.json()
+        WORKER_URL = os.getenv("MCP_TIME_URL", "http://127.0.0.1:8787/get_time?tz=America/Guatemala")
+
+        if USE_JSONRPC:
+            # Derivar URL /rpc a partir de la REST (…/get_time?tz=XXX) o usar MCP_TIME_RPC_URL si existe
+            rpc_env = os.getenv("MCP_TIME_RPC_URL")
+            if rpc_env:
+                rpc_url = rpc_env
+                tz = os.getenv("MCP_TIME_TZ", "America/Guatemala")
+            else:
+                u = urlparse(WORKER_URL)
+                base = WORKER_URL.split("/get_time")[0]  # recorta hasta el host
+                rpc_url = f"{base}/rpc"
+                qs = parse_qs(u.query)
+                tz = (qs.get("tz", ["America/Guatemala"])[0])  # toma tz del query
+
+            payload_rpc = {"jsonrpc": "2.0", "method": "get_time", "params": {"tz": tz}, "id": 1}
+            resp = requests.post(rpc_url, json=payload_rpc, timeout=5).json()
+            data = resp.get("result", {})
+        else:
+            # REST clásico (lo que ya tenías)
+            data = requests.get(WORKER_URL, timeout=5).json()
+
         return {
-            "date": data.get("date", "")[:10],
-            "time": data.get("time", "")[:8],
+            "date": (data.get("date", "") or data.get("datetime_iso", "")[:10]),
+            "time": (data.get("time", "") or data.get("datetime_iso", "")[11:19]),
             "timezone": data.get("timezone", "America/Guatemala")
         }
     except Exception as e:
         return {"error": str(e)}
-    
+
 
 def format_ext1_result(res: dict) -> str:
     if not isinstance(res, dict):

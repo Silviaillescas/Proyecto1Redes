@@ -2,7 +2,6 @@ import os
 import requests
 
 # ========= MCP REMOTO – Hora GT =========
-# También puedes dar fallback local separando por comas en la var:
 # MCP_TIME_URL="https://.../get_time?tz=America/Guatemala,http://127.0.0.1:8787/get_time?tz=America/Guatemala"
 _MCP_TIME_URLS = [u.strip() for u in os.getenv(
     "MCP_TIME_URL",
@@ -17,7 +16,7 @@ def get_remote_time():
             r = requests.get(url, timeout=6, headers={"Accept": "application/json"})
             r.raise_for_status()
             data = r.json()
-            # Formatos admitidos: tu FastAPI (date/time) o Workers con {time:"...Z"}:
+            # Formatos admitidos: FastAPI (date/time) o Workers con {time:"...Z"}:
             if "date" in data and "time" in data:
                 return {
                     "date": data.get("date", "")[:10],
@@ -73,7 +72,7 @@ def ext1_analyze_log_text(text: str):
     except Exception as e:
         return {"error": str(e)}
 
-# (Opcional) si quieres mandar un archivo real:
+# para mandar un archivo real:
 def ext1_analyze_log_file(path: str):
     try:
         with open(path, "rb") as f:
